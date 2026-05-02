@@ -1,0 +1,20 @@
+{
+  "name": "crochet-translator-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Privacy-first crochet pattern translation assistant.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace packages/core run build && npm --workspace apps/web run build",
+    "test": "npm --workspace packages/core run test",
+    "test:watch": "npm --workspace packages/core run test:watch",
+    "typecheck": "npm --workspace packages/core run typecheck && npm --workspace apps/web run typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
