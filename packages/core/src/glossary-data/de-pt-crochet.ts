@@ -13,6 +13,11 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
       "pt-PT": "corrente",
       "pt-BR": "correntinha"
     },
+    pluralTarget: "correntes",
+    pluralTargetVariants: {
+      "pt-PT": "correntes",
+      "pt-BR": "correntinhas"
+    },
     kind: "stitch",
     confidence: 0.95,
     notes: "Common chain stitch abbreviation."
@@ -28,6 +33,10 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     targetVariants: {
       "pt-BR": "correntinha de virada"
     },
+    pluralTarget: "correntes de viragem",
+    pluralTargetVariants: {
+      "pt-BR": "correntinhas de virada"
+    },
     kind: "stitch",
     confidence: 0.92
   },
@@ -39,6 +48,7 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     source: "feste Masche",
     aliases: ["fM", "f. M."],
     target: "ponto baixo",
+    pluralTarget: "pontos baixos",
     kind: "stitch",
     confidence: 0.96
   },
@@ -50,6 +60,7 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     source: "Masche",
     aliases: ["M", "M."],
     target: "ponto",
+    pluralTarget: "pontos",
     kind: "stitch",
     confidence: 0.84,
     notes: "Generic stitch term; context may affect translation."
@@ -66,6 +77,11 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
       "pt-PT": "ponto baixíssimo",
       "pt-BR": "ponto baixíssimo"
     },
+    pluralTarget: "pontos baixíssimos",
+    pluralTargetVariants: {
+      "pt-PT": "pontos baixíssimos",
+      "pt-BR": "pontos baixíssimos"
+    },
     kind: "stitch",
     confidence: 0.95
   },
@@ -77,6 +93,7 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     source: "halbes Stäbchen",
     aliases: ["hStb", "h. Stb."],
     target: "meio ponto alto",
+    pluralTarget: "meios pontos altos",
     kind: "stitch",
     confidence: 0.94
   },
@@ -88,6 +105,7 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     source: "Stäbchen",
     aliases: ["Stb", "Stb."],
     target: "ponto alto",
+    pluralTarget: "pontos altos",
     kind: "stitch",
     confidence: 0.95
   },
@@ -99,6 +117,7 @@ export const germanPortugueseCrochetGlossary: GlossaryEntry[] = [
     source: "Doppelstäbchen",
     aliases: ["DStb", "DStb."],
     target: "ponto alto duplo",
+    pluralTarget: "pontos altos duplos",
     kind: "stitch",
     confidence: 0.94
   },

@@ -19,6 +19,8 @@ export interface GlossaryEntry {
   aliases?: string[];
   target: string;
   targetVariants?: Partial<Record<LanguageCode, string>>;
+  pluralTarget?: string;
+  pluralTargetVariants?: Partial<Record<LanguageCode, string>>;
   kind: GlossaryTermKind;
   confidence: number;
   notes?: string;
@@ -52,12 +54,15 @@ export interface PipelineWarning {
     | "PDF_TEXT_LAYER_EMPTY"
     | "OCR_FALLBACK_USED"
     | "OCR_PAGE_LIMIT"
+    | "OCR_PREPROCESSING_APPLIED"
     | "EXTRACTION_FAILED"
     | "LANGUAGE_MISMATCH"
     | "UNBALANCED_PARENTHESES"
     | "COUNT_TOKEN_DRIFT"
     | "LINE_COUNT_DRIFT"
-    | "PROVIDER_NOT_CONFIGURED";
+    | "PROVIDER_NOT_CONFIGURED"
+    | "TRANSLATION_PROVIDER_UNAVAILABLE"
+    | "TRANSLATION_FAILED";
   message: string;
   severity: "info" | "warning" | "error";
 }

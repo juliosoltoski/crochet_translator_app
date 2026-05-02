@@ -1,6 +1,12 @@
 import type { ExtractedText, PipelineWarning } from "@crochet-translator/core";
 import * as pdfjs from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+import {
+  preprocessCanvasForOcr,
+  preprocessImageForOcr,
+  type ImagePreprocessingCandidate,
+  type OcrSegmentationMode
+} from "./imagePreprocessing";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -18,6 +24,12 @@ type PdfTextItem = {
 type PdfDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 type TesseractModule = typeof import("tesseract.js");
 type ImageLike = Parameters<TesseractModule["recognize"]>[0];
+
+interface OcrResult {
+  text: string;
+  confidence: number;
+  candidateLabel?: string;
+}
 
 export async function extractTextTransiently(file: File): Promise<ExtractedText> {
   try {
@@ -146,9 +158,14 @@ async function extractScannedPdfText(
       background: "rgb(255,255,255)"
     }).promise;
 
-    const result = await recognizeImage(canvas);
+    const preprocessed = preprocessCanvasForOcr(canvas, {
+      maxCandidates: 2,
+      segmentationMode: "auto"
+    });
+    const result = await recognizeBestCandidate(preprocessed.candidates);
     pageTexts.push(result.text.trim());
     confidences.push(result.confidence);
+    warnings.push(...preprocessingWarnings(preprocessed.warnings));
     page.cleanup();
   }
 
@@ -160,25 +177,76 @@ async function extractScannedPdfText(
 }
 
 async function extractImageText(file: File): Promise<ExtractedText> {
-  const result = await recognizeImage(file);
+  const preprocessed = await preprocessImageForOcr(file, {
+    segmentationMode: "single-column"
+  });
+  const result = await recognizeBestCandidate(preprocessed.candidates);
 
   return {
     text: normalizeExtractedText(result.text),
     confidence: result.confidence,
-    warnings: []
+    warnings: preprocessingWarnings([
+      ...preprocessed.warnings,
+      `Selected OCR variant: ${result.candidateLabel ?? "unknown"}.`
+    ])
   };
 }
 
-async function recognizeImage(image: ImageLike): Promise<{ text: string; confidence: number }> {
+async function recognizeImage(
+  worker: Awaited<ReturnType<TesseractModule["createWorker"]>>,
+  image: ImageLike,
+  segmentationMode: OcrSegmentationMode
+): Promise<OcrResult> {
   const tesseract = await loadTesseract();
-  const result = await tesseract.recognize(image, OCR_LANGUAGE, {
-    logger: () => undefined
+
+  await worker.setParameters({
+    preserve_interword_spaces: "1",
+    user_defined_dpi: "300",
+    tessedit_pageseg_mode:
+      segmentationMode === "single-column" ? tesseract.PSM.SINGLE_BLOCK : tesseract.PSM.AUTO
   });
+
+  const result = await worker.recognize(image);
 
   return {
     text: result.data.text,
     confidence: result.data.confidence / 100
   };
+}
+
+async function recognizeBestCandidate(
+  candidates: ImagePreprocessingCandidate[]
+): Promise<OcrResult> {
+  const tesseract = await loadTesseract();
+  const worker = await tesseract.createWorker(OCR_LANGUAGE, tesseract.OEM.LSTM_ONLY, {
+    logger: () => undefined
+  });
+  let bestResult: OcrResult | null = null;
+
+  try {
+    for (const candidate of candidates) {
+      const result = await recognizeImage(worker, candidate.canvas, candidate.segmentationMode);
+      const scoredResult = {
+        ...result,
+        candidateLabel: candidate.label
+      };
+
+      if (!bestResult || scoreOcrResult(scoredResult) > scoreOcrResult(bestResult)) {
+        bestResult = scoredResult;
+      }
+    }
+  } finally {
+    await worker.terminate();
+  }
+
+  if (!bestResult) {
+    return {
+      text: "",
+      confidence: 0
+    };
+  }
+
+  return bestResult;
 }
 
 async function loadTesseract(): Promise<TesseractModule> {
@@ -274,4 +342,22 @@ function extractionErrorMessage(error: unknown): string {
   }
 
   return "Text extraction failed.";
+}
+
+function preprocessingWarnings(messages: string[]): PipelineWarning[] {
+  return messages.map((message) => ({
+    code: "OCR_PREPROCESSING_APPLIED",
+    severity: "info",
+    message
+  }));
+}
+
+function scoreOcrResult(result: OcrResult): number {
+  const text = result.text;
+  const crochetTokenMatches = text.match(/\b(?:Rd|R|M|LM|Lm|fM|Stb|hStb|KM|Km)\b/gu) ?? [];
+  const lineCount = text.split(/\n/u).filter((line) => line.trim().length > 0).length;
+  const alphanumericCount = (text.match(/[\p{L}\p{N}]/gu) ?? []).length;
+  const qualityRatio = text.length > 0 ? alphanumericCount / text.length : 0;
+
+  return result.confidence + crochetTokenMatches.length * 0.015 + lineCount * 0.002 + qualityRatio * 0.05;
 }

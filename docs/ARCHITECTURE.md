@@ -46,7 +46,16 @@ Owns:
 - Input forms.
 - Upload handling.
 - Display of translated text, warnings, and glossary matches.
-- Browser-only transient file extraction placeholder.
+- Browser-only transient file extraction for text, PDF, image OCR, and scanned PDF fallback.
+
+### `apps/api`
+
+Owns:
+
+- Server-side translation provider calls.
+- API key isolation.
+- Request validation and size limits.
+- Privacy-safe provider fallback.
 
 ## Provider Interfaces
 
@@ -56,6 +65,11 @@ Providers should be injected:
 - `LanguageDetectionProvider`
 - `TranslationProvider`
 - Future `PersonalGlossaryProvider`
+
+Current translation providers:
+
+- `passthrough`: local glossary-only preview.
+- `gemini`: server-side Gemini API provider through `@google/genai`.
 
 This keeps the app independent from a specific OCR, PDF parser, LLM, or translation API.
 
@@ -104,6 +118,8 @@ The browser OCR fallback is intentionally capped to the first few PDF pages for 
    - Parenthesis balance.
    - Repeat markers.
 8. Return translated text, warnings, and glossary match metadata.
+
+The browser calls `POST /api/translate` when available. If the API is not running, the web app falls back to the local passthrough pipeline and shows a warning. Gemini API keys stay on the API server and are never exposed to Vite/browser code.
 
 ## Data Model
 

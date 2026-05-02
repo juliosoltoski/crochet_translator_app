@@ -54,6 +54,7 @@ Manual MVP checks:
 - Upload a selectable-text PDF and confirm text appears without OCR fallback warnings.
 - Upload a scanned PDF and confirm OCR fallback warnings appear.
 - Upload a clear German pattern image and confirm OCR confidence is shown through warnings when low.
+- Upload `test-fixtures/ocr/manual/magazine-layout-daffodil-dorothy.jpeg` and inspect column order plus crochet abbreviation recognition.
 
 ## Accessibility And UI Tests
 

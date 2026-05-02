@@ -36,6 +36,8 @@ OCR and translation providers may receive copyrighted user material during proce
 - Document provider retention behavior.
 - Add user-facing privacy notice.
 
+The Gemini provider is server-side only. Do not expose `GEMINI_API_KEY` or `GOOGLE_API_KEY` through Vite or browser code. Keep keys in `.env` or deployment secrets, restrict them to the Generative Language API where possible, and rotate them if they are ever exposed.
+
 ## Copyright-Safe Storage Strategy
 
 Do:

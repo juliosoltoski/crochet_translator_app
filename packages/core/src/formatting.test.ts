@@ -18,7 +18,7 @@ describe("formatting preservation", () => {
     });
 
     expect(result.translatedText.split("\n")).toHaveLength(2);
-    expect(result.translatedText).toContain("(6 ponto)");
+    expect(result.translatedText).toContain("(6 pontos)");
     expect(result.translatedText).toContain("6x");
     expect(result.warnings).toEqual([]);
   });

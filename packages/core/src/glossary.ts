@@ -30,7 +30,6 @@ export function applyGlossaryReplacements(
 
   for (const { entry, term } of applicableEntries) {
     const regex = createTermRegex(term, entry);
-    const target = getEntryTarget(entry, options.targetVariant);
 
     transformed = transformed.replace(regex, (...args: unknown[]) => {
       const match = String(args[0]);
@@ -38,6 +37,12 @@ export function applyGlossaryReplacements(
       const prefix = entry.wholeWord === false ? "" : getBoundaryPrefix(match);
       const matchedTerm = entry.wholeWord === false ? match : match.slice(prefix.length);
       const matchIndex = offset + prefix.length;
+      const target = getContextualEntryTarget(
+        entry,
+        options.targetVariant,
+        transformed,
+        matchIndex
+      );
 
       matches.push({
         entryId: entry.id,
@@ -68,6 +73,30 @@ export function getEntryTarget(
   return entry.target;
 }
 
+export function getContextualEntryTarget(
+  entry: GlossaryEntry,
+  targetVariant: LanguageCode | undefined,
+  text: string,
+  matchIndex: number
+): string {
+  if (shouldUsePluralTarget(entry, text, matchIndex)) {
+    return getEntryPluralTarget(entry, targetVariant);
+  }
+
+  return getEntryTarget(entry, targetVariant);
+}
+
+export function getEntryPluralTarget(
+  entry: GlossaryEntry,
+  targetVariant?: LanguageCode
+): string {
+  if (targetVariant && entry.pluralTargetVariants?.[targetVariant]) {
+    return entry.pluralTargetVariants[targetVariant];
+  }
+
+  return entry.pluralTarget ?? pluralizePortugueseTerm(getEntryTarget(entry, targetVariant));
+}
+
 function termsForEntry(entry: GlossaryEntry): string[] {
   return [entry.source, ...(entry.aliases ?? [])].filter(Boolean);
 }
@@ -90,4 +119,49 @@ function getBoundaryPrefix(match: string): string {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function shouldUsePluralTarget(
+  entry: GlossaryEntry,
+  text: string,
+  matchIndex: number
+): boolean {
+  if (entry.kind !== "stitch") {
+    return false;
+  }
+
+  const count = getPreviousCount(text, matchIndex);
+  return count !== null && count !== 1;
+}
+
+function getPreviousCount(text: string, matchIndex: number): number | null {
+  const prefix = text.slice(0, matchIndex);
+  const match = prefix.match(/(?:^|[\s(:,\[])(\d+)(?:\.)?\s*$/u);
+
+  if (!match) {
+    return null;
+  }
+
+  const count = Number(match[1]);
+  return Number.isFinite(count) ? count : null;
+}
+
+function pluralizePortugueseTerm(term: string): string {
+  return term.split(" ").map(pluralizePortugueseWord).join(" ");
+}
+
+function pluralizePortugueseWord(word: string): string {
+  if (word.endsWith("s")) {
+    return word;
+  }
+
+  if (word.endsWith("m")) {
+    return `${word.slice(0, -1)}ns`;
+  }
+
+  if (word.endsWith("l")) {
+    return `${word.slice(0, -1)}is`;
+  }
+
+  return `${word}s`;
 }

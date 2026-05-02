@@ -2,13 +2,13 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { Languages, Upload } from "lucide-react";
 import {
   germanPortugueseCrochetGlossary,
-  runTranslationPipeline,
   type GlossaryMatch,
   type ExtractedText,
   type LanguageCode,
   type PipelineWarning
 } from "@crochet-translator/core";
 import { extractTextTransiently } from "./services/transientExtraction";
+import { translatePattern } from "./services/translationClient";
 
 const SAMPLE_PATTERN = `Rd. 1: 6 fM in den Fadenring (6 M)
 Rd. 2: (2 fM in jede M) 6x (12 M)
@@ -22,6 +22,7 @@ export function App() {
   const [matches, setMatches] = useState<GlossaryMatch[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
+  const [providerName, setProviderName] = useState("local passthrough");
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
 
@@ -42,7 +43,7 @@ export function App() {
     setStatusMessage("Translating");
 
     try {
-      const result = await runTranslationPipeline({
+      const result = await translatePattern({
         text,
         sourceLanguage: "de",
         targetLanguage: "pt",
@@ -53,6 +54,7 @@ export function App() {
       setTranslatedText(result.translatedText);
       setWarnings([...extractionWarnings, ...result.warnings]);
       setMatches(result.glossaryMatches);
+      setProviderName(result.providerName);
       setStatusMessage("Ready");
     } finally {
       setIsProcessing(false);
@@ -158,7 +160,9 @@ export function App() {
             {matchedTermCount > 0
               ? `${matchedTermCount} glossary matches found`
               : `${germanPortugueseCrochetGlossary.length} glossary terms loaded`}
-            {" · "}
+            {" - "}
+            {providerName}
+            {" - "}
             {statusMessage}
           </p>
         </div>

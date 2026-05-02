@@ -20,11 +20,14 @@
 
 ## Phase 3: Real Translation
 
-- Add LLM or translation API provider.
-- Protect glossary terms before translation.
+- Add LLM or translation API provider. Done for server-side Gemini provider.
+- Protect glossary terms before translation. Done through the shared core pipeline.
 - Add post-translation terminology validation.
 - Add prompt/provider contracts requiring line, count, and repeat preservation.
 - Add provider privacy review.
+- Add free-tier quota/rate-limit handling with clearer user messages.
+- Add streaming translation progress.
+- Add configurable provider selection in the UI.
 
 ## Phase 4: User Preferences
 
