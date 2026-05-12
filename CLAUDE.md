@@ -65,6 +65,14 @@ Entries in `packages/core/src/glossary-data/de-pt-crochet.ts` follow `GlossaryEn
 - `pluralTarget` / `pluralTargetVariants` are used when a preceding number context is detected.
 - Future craft namespaces (knitting) must use a separate `craft` value, not share stitch entries with `crochet`.
 
+## Git Workflow
+
+Commit and push to GitHub regularly throughout work — after each meaningful unit of progress, not just at the end. This preserves work-in-progress and keeps the remote up to date.
+
+- Stage only relevant files by name, not `git add -A`.
+- Write concise commit messages that describe why, not just what.
+- Push after each commit: `git push`.
+
 ## Coding Conventions
 
 - TypeScript strict mode throughout.
