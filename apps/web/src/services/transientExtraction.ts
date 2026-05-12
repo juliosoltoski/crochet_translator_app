@@ -10,9 +10,9 @@ import {
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-const MIN_SELECTABLE_PDF_CHARACTERS = 40;
+const MIN_SELECTABLE_PDF_CHARACTERS = 200;
 const MAX_OCR_PDF_PAGES = 5;
-const PDF_RENDER_SCALE = 2;
+const PDF_RENDER_SCALE = 3;
 const OCR_LANGUAGE = "deu";
 
 type PdfTextItem = {
@@ -209,7 +209,7 @@ async function recognizeImage(
   const result = await worker.recognize(image);
 
   return {
-    text: result.data.text,
+    text: normalizeOcrText(result.data.text),
     confidence: result.data.confidence / 100
   };
 }
@@ -352,12 +352,27 @@ function preprocessingWarnings(messages: string[]): PipelineWarning[] {
   }));
 }
 
+const CROCHET_TOKEN_REGEX =
+  /\b(?:Rd|Runde|Runden|Reihe|fM|LM|Lm|Luftm|Luftmasche|Stb|hStb|DStb|KM|Km|Kettm|Kettmasche|zun|abn|Wdh|wdh|WLM|Fadenring|Maschenring|wenden|zunehmen|abnehmen|wiederholen)\b/giu;
+
 function scoreOcrResult(result: OcrResult): number {
   const text = result.text;
-  const crochetTokenMatches = text.match(/\b(?:Rd|R|M|LM|Lm|fM|Stb|hStb|KM|Km)\b/gu) ?? [];
+  const crochetTokenMatches = text.match(CROCHET_TOKEN_REGEX) ?? [];
   const lineCount = text.split(/\n/u).filter((line) => line.trim().length > 0).length;
   const alphanumericCount = (text.match(/[\p{L}\p{N}]/gu) ?? []).length;
   const qualityRatio = text.length > 0 ? alphanumericCount / text.length : 0;
 
   return result.confidence + crochetTokenMatches.length * 0.015 + lineCount * 0.002 + qualityRatio * 0.05;
+}
+
+function normalizeOcrText(text: string): string {
+  return (
+    text
+      // Replace lowercase l with digit 1 when adjacent to digits (e.g. "l2" → "12", "6xl" → "6x1")
+      .replace(/(?<=\d)l(?=\d)/gu, "1")
+      .replace(/(?<=\d)l\b/gu, "1")
+      .replace(/\bl(?=\d)/gu, "1")
+      // Repair "Rd l:" / "R l:" patterns — l after structure abbreviation is almost certainly 1
+      .replace(/\b(Rd|R)\.\s+l\b/gu, "$1. 1")
+  );
 }

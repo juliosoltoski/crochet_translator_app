@@ -23,6 +23,7 @@ export function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [providerName, setProviderName] = useState("local passthrough");
+  const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
 
@@ -68,8 +69,14 @@ export function App() {
       return;
     }
 
+    setShowMultiColumnHint(false);
     setIsProcessing(true);
     setStatusMessage("Extracting text");
+
+    if (file.type.startsWith("image/")) {
+      const isWide = await checkImageIsWide(file);
+      setShowMultiColumnHint(isWide);
+    }
 
     try {
       const extracted = await extractTextTransiently(file);
@@ -125,6 +132,12 @@ export function App() {
             <span>Upload image, PDF, or text</span>
           </label>
         </div>
+
+        {showMultiColumnHint && (
+          <p className="notice info" role="note">
+            Multi-column layout detected. For best results, crop the image to one column before uploading.
+          </p>
+        )}
 
         <div className="editor-grid">
           <section className="panel" aria-labelledby="source-heading">
@@ -200,6 +213,25 @@ export function App() {
       </section>
     </main>
   );
+}
+
+async function checkImageIsWide(file: File): Promise<boolean> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img.width > img.height * 1.4);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(false);
+    };
+
+    img.src = url;
+  });
 }
 
 function warningsForExtraction(extracted: ExtractedText): PipelineWarning[] {

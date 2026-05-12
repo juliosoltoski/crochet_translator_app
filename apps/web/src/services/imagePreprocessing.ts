@@ -18,8 +18,10 @@ export interface ImagePreprocessingOptions {
 
 const MAX_LONG_EDGE = 2800;
 const TARGET_MIN_TEXT_EDGE = 1800;
-const MAX_DESKEW_DEGREES = 7;
-const DESKEW_STEP_DEGREES = 0.5;
+const MAX_DESKEW_DEGREES = 15;
+const DESKEW_COARSE_STEP = 1.0;
+const DESKEW_FINE_STEP = 0.25;
+const DESKEW_FINE_RADIUS = 1.5;
 
 export async function preprocessImageForOcr(
   image: Blob,
@@ -174,14 +176,24 @@ function estimateSkewAngle(source: HTMLCanvasElement): number {
     return 0;
   }
 
-  let bestAngle = 0;
-  let bestScore = -Infinity;
+  let coarseBest = 0;
+  let coarseScore = -Infinity;
 
-  for (
-    let angle = -MAX_DESKEW_DEGREES;
-    angle <= MAX_DESKEW_DEGREES;
-    angle += DESKEW_STEP_DEGREES
-  ) {
+  for (let angle = -MAX_DESKEW_DEGREES; angle <= MAX_DESKEW_DEGREES; angle += DESKEW_COARSE_STEP) {
+    const score = scoreHorizontalProjection(darkPixels, analysisCanvas.height, angle);
+
+    if (score > coarseScore) {
+      coarseScore = score;
+      coarseBest = angle;
+    }
+  }
+
+  let bestAngle = coarseBest;
+  let bestScore = coarseScore;
+  const fineMin = coarseBest - DESKEW_FINE_RADIUS;
+  const fineMax = coarseBest + DESKEW_FINE_RADIUS;
+
+  for (let angle = fineMin; angle <= fineMax; angle += DESKEW_FINE_STEP) {
     const score = scoreHorizontalProjection(darkPixels, analysisCanvas.height, angle);
 
     if (score > bestScore) {
