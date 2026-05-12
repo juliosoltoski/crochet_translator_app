@@ -511,3 +511,115 @@ function otsuThreshold(histogram: number[]): number {
 function clamp(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
+
+// ---------------------------------------------------------------------------
+// Multi-column detection and splitting
+// ---------------------------------------------------------------------------
+
+const COLUMN_DETECT_MAX_WIDTH = 1000;
+const COLUMN_GUTTER_THRESHOLD = 0.06;
+const COLUMN_MIN_GUTTER_PX = 40;
+const COLUMN_SMOOTH_WINDOW = 24;
+
+/**
+ * Returns the canvas split into one canvas per column, or a single-element
+ * array if no column gutter is found.
+ */
+export function detectAndSplitColumns(canvas: HTMLCanvasElement): HTMLCanvasElement[] {
+  const gutterX = findColumnGutterX(canvas);
+  if (gutterX === null) return [canvas];
+  return [
+    cropCanvasRegion(canvas, 0, 0, gutterX, canvas.height),
+    cropCanvasRegion(canvas, gutterX, 0, canvas.width - gutterX, canvas.height)
+  ];
+}
+
+function findColumnGutterX(canvas: HTMLCanvasElement): number | null {
+  const { width, height } = canvas;
+
+  // Only attempt splitting on landscape-ish images (wider than tall by ≥20%)
+  if (width < height * 1.2) return null;
+
+  // Work on a downscaled copy for speed
+  const scale = Math.min(1, COLUMN_DETECT_MAX_WIDTH / width);
+  const dw = Math.round(width * scale);
+  const dh = Math.round(height * scale);
+  const small = document.createElement("canvas");
+  small.width = dw;
+  small.height = dh;
+  const ctx = require2dContext(small);
+  ctx.drawImage(canvas, 0, 0, dw, dh);
+
+  const data = ctx.getImageData(0, 0, dw, dh).data;
+
+  // Vertical projection: fraction of dark pixels per x-column
+  const profile = new Float32Array(dw);
+  for (let x = 0; x < dw; x++) {
+    let dark = 0;
+    for (let y = 0; y < dh; y++) {
+      const i = (y * dw + x) * 4;
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      if (gray < 160) dark++;
+    }
+    profile[x] = dark / dh;
+  }
+
+  // Smooth the profile
+  const smoothed = new Float32Array(dw);
+  const half = Math.floor(COLUMN_SMOOTH_WINDOW / 2);
+  for (let x = 0; x < dw; x++) {
+    let sum = 0;
+    let count = 0;
+    for (let k = -half; k <= half; k++) {
+      const nx = x + k;
+      if (nx >= 0 && nx < dw) {
+        sum += profile[nx];
+        count++;
+      }
+    }
+    smoothed[x] = sum / count;
+  }
+
+  // Search middle 50% of the image for the widest low-density band (gutter)
+  const searchStart = Math.floor(dw * 0.25);
+  const searchEnd = Math.floor(dw * 0.75);
+  const minGutterPx = Math.round(COLUMN_MIN_GUTTER_PX * scale);
+
+  let bestStart = -1;
+  let bestWidth = 0;
+  let runStart = -1;
+
+  for (let x = searchStart; x <= searchEnd; x++) {
+    if (smoothed[x] <= COLUMN_GUTTER_THRESHOLD) {
+      if (runStart === -1) runStart = x;
+    } else if (runStart !== -1) {
+      const w = x - runStart;
+      if (w > bestWidth) { bestWidth = w; bestStart = runStart; }
+      runStart = -1;
+    }
+  }
+  if (runStart !== -1) {
+    const w = searchEnd - runStart;
+    if (w > bestWidth) { bestWidth = w; bestStart = runStart; }
+  }
+
+  if (bestWidth < minGutterPx) return null;
+
+  // Map gutter centre back to original resolution
+  const gutterCentreSmall = bestStart + Math.floor(bestWidth / 2);
+  return Math.round(gutterCentreSmall / scale);
+}
+
+function cropCanvasRegion(
+  src: HTMLCanvasElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): HTMLCanvasElement {
+  const dst = document.createElement("canvas");
+  dst.width = w;
+  dst.height = h;
+  require2dContext(dst).drawImage(src, x, y, w, h, 0, 0, w, h);
+  return dst;
+}

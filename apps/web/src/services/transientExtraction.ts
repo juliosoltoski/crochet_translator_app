@@ -2,6 +2,7 @@ import type { ExtractedText, PipelineWarning } from "@crochet-translator/core";
 import * as pdfjs from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import {
+  detectAndSplitColumns,
   preprocessCanvasForOcr,
   preprocessImageForOcr,
   type ImagePreprocessingCandidate,
@@ -178,17 +179,40 @@ async function extractScannedPdfText(
 }
 
 async function extractImageText(file: File): Promise<ExtractedText> {
-  const serverResult = await tryServerOcr(file);
+  // Load the image into a canvas so we can inspect its layout before sending to OCR.
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+  bitmap.close();
 
-  if (serverResult !== null) {
-    return serverResult;
+  const columns = detectAndSplitColumns(canvas);
+
+  if (columns.length > 1) {
+    const results = await Promise.all(
+      columns.map((col) => extractCanvasText(col, file.type || "image/jpeg"))
+    );
+    const combinedText = results
+      .map((r) => r.text)
+      .filter(Boolean)
+      .join("\n\n");
+    return {
+      text: normalizeExtractedText(combinedText),
+      confidence: Math.min(...results.map((r) => r.confidence ?? 0)),
+      warnings: [
+        { code: "OCR_PREPROCESSING_APPLIED", severity: "info", message: "Multi-column layout detected — each column was extracted separately." },
+        ...results.flatMap((r) => r.warnings ?? [])
+      ]
+    };
   }
 
-  const preprocessed = await preprocessImageForOcr(file, {
-    segmentationMode: "single-column"
-  });
-  const result = await recognizeBestCandidate(preprocessed.candidates);
+  // Single-column path: try server OCR first, then Tesseract.
+  const serverResult = await tryServerOcr(file);
+  if (serverResult !== null) return serverResult;
 
+  const preprocessed = await preprocessImageForOcr(file, { segmentationMode: "single-column" });
+  const result = await recognizeBestCandidate(preprocessed.candidates);
   return {
     text: normalizeExtractedText(result.text),
     confidence: result.confidence,
@@ -197,6 +221,31 @@ async function extractImageText(file: File): Promise<ExtractedText> {
       `Selected OCR variant: ${result.candidateLabel ?? "unknown"}.`
     ])
   };
+}
+
+async function extractCanvasText(
+  canvas: HTMLCanvasElement,
+  mimeType: string
+): Promise<ExtractedText> {
+  const base64 = canvasToJpegBase64(canvas);
+  const serverResult = await tryServerOcrBase64(base64, mimeType);
+  if (serverResult !== null) return serverResult;
+
+  const preprocessed = preprocessCanvasForOcr(canvas, {
+    maxCandidates: 2,
+    segmentationMode: "single-column"
+  });
+  const result = await recognizeBestCandidate(preprocessed.candidates);
+  return {
+    text: normalizeExtractedText(result.text),
+    confidence: result.confidence,
+    warnings: preprocessingWarnings(preprocessed.warnings)
+  };
+}
+
+function canvasToJpegBase64(canvas: HTMLCanvasElement): string {
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
 }
 
 // btoa(String.fromCharCode(...bytes)) crashes on large files (stack overflow from spread).
@@ -214,28 +263,28 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 async function tryServerOcr(file: File): Promise<ExtractedText | null> {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = arrayBufferToBase64(arrayBuffer);
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
+  return tryServerOcrBase64(base64, file.type || "image/jpeg");
+}
 
+async function tryServerOcrBase64(
+  base64: string,
+  mimeType: string
+): Promise<ExtractedText | null> {
+  try {
     const response = await fetch(OCR_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageData: base64, mimeType: file.type || "image/jpeg" })
+      body: JSON.stringify({ imageData: base64, mimeType })
     });
 
-    if (!response.ok) {
-      return null;
-    }
+    if (!response.ok) return null;
 
     const result = (await response.json()) as ExtractedText;
 
-    // If the API returned but the provider is not configured, fall back to Tesseract
-    const isUnconfigured = result.warnings?.some(
-      (w) => w.code === "PROVIDER_NOT_CONFIGURED"
-    );
-
-    if (isUnconfigured) {
+    // If the provider is not configured, fall back to Tesseract
+    if (result.warnings?.some((w) => w.code === "PROVIDER_NOT_CONFIGURED")) {
       return null;
     }
 
