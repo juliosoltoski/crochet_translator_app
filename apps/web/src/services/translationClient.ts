@@ -25,17 +25,35 @@ const API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL ?? "http://localho
 export async function translatePattern(
   input: TranslatePatternInput
 ): Promise<TranslatePatternResult> {
+  let apiWarnings: PipelineWarning[] = [];
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/translate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(input)
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(`${API_BASE_URL}/api/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
+    } catch {
+      // Network-level failure: server is not reachable at all.
+      throw new ApiError(
+        "TRANSLATION_PROVIDER_UNAVAILABLE",
+        "Translation API is not reachable. Make sure both servers are running with `npm run dev`."
+      );
+    }
 
     if (!response.ok) {
-      throw new Error(`Translation API returned ${response.status}.`);
+      // Server responded but with an error — extract the reason from the body.
+      const body = await safeReadJson(response);
+      const message =
+        body?.error ??
+        `Translation API returned ${response.status}.`;
+
+      apiWarnings = normalizeWarnings(body?.warnings);
+
+      throw new ApiError("TRANSLATION_FAILED", message);
     }
 
     const result = (await response.json()) as TranslationPipelineResult & {
@@ -49,21 +67,52 @@ export async function translatePattern(
       provider: "api",
       providerName: result.provider ?? "api"
     };
-  } catch {
+  } catch (error) {
     const fallback = await runTranslationPipeline(input);
-    const warning: PipelineWarning = {
-      code: "TRANSLATION_PROVIDER_UNAVAILABLE",
-      severity: "warning",
-      message: "Translation API is unavailable. Used local glossary-only preview."
-    };
+
+    const warning: PipelineWarning =
+      error instanceof ApiError
+        ? { code: error.warningCode, severity: "warning", message: error.message }
+        : {
+            code: "TRANSLATION_PROVIDER_UNAVAILABLE",
+            severity: "warning",
+            message: "Translation API is unavailable. Used local glossary-only preview."
+          };
 
     return {
       ...fallback,
-      warnings: [warning, ...fallback.warnings],
+      warnings: [warning, ...apiWarnings, ...fallback.warnings],
       provider: "local",
       providerName: "local passthrough"
     };
   }
+}
+
+class ApiError extends Error {
+  constructor(
+    public readonly warningCode: PipelineWarning["code"],
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+async function safeReadJson(
+  response: Response
+): Promise<{ error?: string; warnings?: unknown } | null> {
+  try {
+    return (await response.json()) as { error?: string; warnings?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWarnings(value: unknown): PipelineWarning[] {
+  return Array.isArray(value)
+    ? (value as PipelineWarning[]).filter(
+        (w) => typeof w === "object" && w !== null && "code" in w && "message" in w
+      )
+    : [];
 }
 
 function normalizeMatches(matches: GlossaryMatch[] | undefined): GlossaryMatch[] {
