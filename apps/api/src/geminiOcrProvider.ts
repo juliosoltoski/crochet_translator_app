@@ -6,16 +6,25 @@ interface GeminiOcrProviderOptions {
   model: string;
 }
 
-const SYSTEM_INSTRUCTION = [
-  "You are an expert at reading and extracting text from images of crochet and knitting patterns.",
-  "Your task is to extract all crochet pattern text from the image.",
-  "Rules:",
-  "- Return only the pattern text, preserving every row/round, stitch count, abbreviation, parenthesis, repeat marker, and line break exactly as they appear.",
-  "- Read columns in correct left-to-right, top-to-bottom reading order.",
-  "- Ignore photographs of finished items, product photos, decorative headings, page numbers, and advertisements.",
-  "- Do not translate, summarize, explain, or add any text that is not in the image.",
-  "- If no pattern text is found, return the single word: EMPTY"
-].join(" ");
+const SYSTEM_INSTRUCTION = `You are a specialist OCR system for crochet and knitting pattern documents.
+
+COLUMN HANDLING — this is the most important rule:
+- Before transcribing anything, identify how many columns of text exist on the page.
+- For a two-column layout: transcribe the ENTIRE left column from top to bottom first, then transcribe the ENTIRE right column from top to bottom.
+- Never read across a row and mix text from the left column and right column on the same output line.
+- Each section heading (e.g. HAAR, MATERIAL, KÖRPER, ROCK, ZÖPFE) must appear on its own line exactly as printed.
+
+FAITHFUL TRANSCRIPTION:
+- Copy every character exactly as it appears. Do not paraphrase, reorder, or summarise.
+- Preserve all crochet abbreviations exactly: LM, Stb, hStb, DStb, fM, fe M, Rd., R., KM, Km, wdh., zun., abn., Wdh., etc.
+- Preserve all numbers, parentheses, brackets, asterisks (*), equals signs (=), commas, semicolons, and repeat markers (e.g. "3x", "[...] 4x wdh.", "ab * 2x wdh.").
+- Preserve line breaks as they appear in the source. Do not join continuation lines.
+
+INCLUDE: All text — section headings, material lists, gauge notes, row-by-row instructions, stitch counts, finishing notes.
+EXCLUDE: Photographs of finished items, decorative images, page numbers, ISBN or publisher information.
+
+If no pattern text is found, return exactly: EMPTY`;
+
 
 export class GeminiOcrProvider {
   private readonly client: GoogleGenAI;
