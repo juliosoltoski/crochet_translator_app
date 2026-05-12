@@ -3,12 +3,14 @@ import express from "express";
 import {
   runTranslationPipeline,
   type Craft,
+  type ExtractedText,
   type LanguageCode,
   type PipelineWarning,
   type TranslationPipelineResult
 } from "@crochet-translator/core";
 import { loadConfig } from "./config";
 import { createTranslationProvider } from "./translationProviderFactory";
+import { GeminiOcrProvider } from "./geminiOcrProvider";
 
 interface TranslateRequestBody {
   text?: unknown;
@@ -27,14 +29,71 @@ const app = express();
 
 app.disable("x-powered-by");
 app.use(cors({ origin: config.corsOrigin }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "15mb" }));
 
 app.get("/health", (_request, response) => {
   response.json({
     ok: true,
     provider: config.provider,
+    ocrProvider: config.ocrProvider,
     storesRecipeContent: false
   });
+});
+
+app.post("/api/ocr", async (request, response) => {
+  const body = request.body as { imageData?: unknown; mimeType?: unknown };
+
+  if (typeof body.imageData !== "string" || body.imageData.length === 0) {
+    response.status(400).json({ error: "imageData (base64 string) is required." });
+    return;
+  }
+
+  if (typeof body.mimeType !== "string") {
+    response.status(400).json({ error: "mimeType is required." });
+    return;
+  }
+
+  const byteLength = Math.round((body.imageData.length * 3) / 4);
+
+  if (byteLength > config.maxOcrImageBytes) {
+    response.status(413).json({
+      error: `Image exceeds the ${Math.round(config.maxOcrImageBytes / 1024 / 1024)} MB limit.`
+    });
+    return;
+  }
+
+  if (config.ocrProvider !== "gemini" || !config.geminiApiKey) {
+    const warning: PipelineWarning = {
+      code: "PROVIDER_NOT_CONFIGURED",
+      severity: "warning",
+      message:
+        config.ocrProvider === "gemini"
+          ? "OCR_PROVIDER is gemini but GEMINI_API_KEY is missing."
+          : "OCR_PROVIDER is passthrough. Set OCR_PROVIDER=gemini to enable server-side OCR."
+    };
+
+    const result: ExtractedText = { text: "", confidence: 0, warnings: [warning] };
+    response.json(result);
+    return;
+  }
+
+  try {
+    const ocrProvider = new GeminiOcrProvider({
+      apiKey: config.geminiApiKey,
+      model: config.geminiOcrModel
+    });
+
+    const result = await ocrProvider.extract(body.imageData, body.mimeType);
+    response.json(result);
+  } catch (error) {
+    const warning: PipelineWarning = {
+      code: "EXTRACTION_FAILED",
+      severity: "error",
+      message: error instanceof Error ? `OCR failed: ${error.message}` : "OCR failed."
+    };
+
+    response.status(502).json({ text: "", confidence: 0, warnings: [warning] });
+  }
 });
 
 app.post("/api/translate", async (request, response) => {

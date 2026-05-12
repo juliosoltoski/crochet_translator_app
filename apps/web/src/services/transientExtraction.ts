@@ -14,6 +14,7 @@ const MIN_SELECTABLE_PDF_CHARACTERS = 200;
 const MAX_OCR_PDF_PAGES = 5;
 const PDF_RENDER_SCALE = 3;
 const OCR_LANGUAGE = "deu";
+const OCR_API_URL = `${import.meta.env.VITE_TRANSLATION_API_URL ?? "http://localhost:8787"}/api/ocr`;
 
 type PdfTextItem = {
   str: string;
@@ -177,6 +178,12 @@ async function extractScannedPdfText(
 }
 
 async function extractImageText(file: File): Promise<ExtractedText> {
+  const serverResult = await tryServerOcr(file);
+
+  if (serverResult !== null) {
+    return serverResult;
+  }
+
   const preprocessed = await preprocessImageForOcr(file, {
     segmentationMode: "single-column"
   });
@@ -190,6 +197,38 @@ async function extractImageText(file: File): Promise<ExtractedText> {
       `Selected OCR variant: ${result.candidateLabel ?? "unknown"}.`
     ])
   };
+}
+
+async function tryServerOcr(file: File): Promise<ExtractedText | null> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+    const response = await fetch(OCR_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData: base64, mimeType: file.type || "image/jpeg" })
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const result = (await response.json()) as ExtractedText;
+
+    // If the API returned but the provider is not configured, fall back to Tesseract
+    const isUnconfigured = result.warnings?.some(
+      (w) => w.code === "PROVIDER_NOT_CONFIGURED"
+    );
+
+    if (isUnconfigured) {
+      return null;
+    }
+
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 async function recognizeImage(
