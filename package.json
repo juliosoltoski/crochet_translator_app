@@ -12,9 +12,9 @@
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
     "build": "npm --workspace packages/core run build && npm --workspace apps/api run build && npm --workspace apps/web run build",
-    "test": "npm --workspace packages/core run test",
+    "test": "npm --workspace packages/core run test && npm --workspace packages/ocr-eval run test",
     "test:watch": "npm --workspace packages/core run test:watch",
-    "typecheck": "npm --workspace packages/core run typecheck && npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck"
+    "typecheck": "npm --workspace packages/core run typecheck && npm --workspace packages/ocr-eval run typecheck && npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck"
   },
   "engines": {
     "node": ">=20.0.0"
