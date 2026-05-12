@@ -14,7 +14,7 @@ const MIN_SELECTABLE_PDF_CHARACTERS = 200;
 const MAX_OCR_PDF_PAGES = 5;
 const PDF_RENDER_SCALE = 3;
 const OCR_LANGUAGE = "deu";
-const OCR_API_URL = `${import.meta.env.VITE_TRANSLATION_API_URL ?? "http://localhost:8787"}/api/ocr`;
+const OCR_API_URL = `${import.meta.env.VITE_TRANSLATION_API_URL ?? ""}/api/ocr`;
 
 type PdfTextItem = {
   str: string;

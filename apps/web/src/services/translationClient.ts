@@ -20,7 +20,9 @@ export interface TranslatePatternResult extends TranslationPipelineResult {
   providerName: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL ?? "http://localhost:8787";
+// Empty string → relative URLs → Vite proxy forwards to the API server (no CORS).
+// Set VITE_TRANSLATION_API_URL only for production deployments where the API is on a different host.
+const API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL ?? "";
 
 export async function translatePattern(
   input: TranslatePatternInput
