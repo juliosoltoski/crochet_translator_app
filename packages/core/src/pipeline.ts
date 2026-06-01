@@ -1,13 +1,15 @@
 import { germanPortugueseCrochetGlossary } from "./glossary-data/de-pt-crochet";
 import { englishPortugueseCrochetGlossary } from "./glossary-data/en-pt-crochet";
-
-const defaultCrochetGlossary = [
-  ...germanPortugueseCrochetGlossary,
-  ...englishPortugueseCrochetGlossary
-];
+import { englishUkPortugueseCrochetGlossary } from "./glossary-data/en-uk-pt-crochet";
 import { validatePatternStructure } from "./formatting";
 import { applyGlossaryReplacements } from "./glossary";
 import { PassthroughTranslationProvider, StaticLanguageDetectionProvider } from "./providers";
+
+const defaultCrochetGlossary = [
+  ...germanPortugueseCrochetGlossary,
+  ...englishPortugueseCrochetGlossary,
+  ...englishUkPortugueseCrochetGlossary
+];
 import type {
   GlossaryEntry,
   LanguageCode,

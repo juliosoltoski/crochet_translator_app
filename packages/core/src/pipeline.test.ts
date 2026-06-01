@@ -80,6 +80,35 @@ describe("runTranslationPipeline", () => {
     expect(result.translatedText).toContain("fM");
   });
 
+  it("English (UK) input: dc maps to ponto baixo and sourceLanguage is forwarded to provider", async () => {
+    let capturedSourceLanguage: string | undefined;
+
+    const provider: TranslationProvider = {
+      async translate(input) {
+        capturedSourceLanguage = input.sourceLanguage;
+        return input.text;
+      }
+    };
+
+    const result = await runTranslationPipeline(
+      {
+        text: "Rnd 1: 6 dc into magic ring (6 sts)",
+        sourceLanguage: "en-UK",
+        targetLanguage: "pt",
+        targetVariant: "pt-PT",
+        craft: "crochet"
+      },
+      { translationProvider: provider }
+    );
+
+    expect(capturedSourceLanguage).toBe("en-UK");
+    // UK dc → ponto baixo (single crochet equivalent), not ponto alto.
+    // Count 6 triggers plural → "pontos baixos".
+    expect(result.translatedText).toContain("pontos baixos");
+    expect(result.translatedText).not.toContain("pontos altos");
+    expect(result.glossaryMatches.some((m) => m.entryId === "crochet.en-UK.pt.double-crochet")).toBe(true);
+  });
+
   it("ambiguous/mixed input: emits LANGUAGE_MISMATCH warning when detected differs from declared", async () => {
     // Simulate a detector that guesses "de" when the caller said "en"
     const result = await runTranslationPipeline(

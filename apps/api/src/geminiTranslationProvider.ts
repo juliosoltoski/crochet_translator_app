@@ -38,10 +38,14 @@ function buildInstructions(sourceLanguage: LanguageCode, targetVariant?: Languag
   const portugueseVariant =
     targetVariant === "pt-BR" ? "Brazilian Portuguese" : "European Portuguese";
   const sourceLanguageName = sourceLanguageLabel(sourceLanguage);
+  const stitchConventionNote =
+    sourceLanguage === "en-UK"
+      ? " Note: this text uses UK crochet conventions (UK dc = single crochet, UK tr = double crochet, UK htr = half double crochet, UK dtr = treble crochet)."
+      : "";
 
   return [
     "You are a careful crochet pattern translator.",
-    `Translate ${sourceLanguageName} crochet pattern text into Portuguese.`,
+    `Translate ${sourceLanguageName} crochet pattern text into Portuguese.${stitchConventionNote}`,
     `Use ${portugueseVariant} terminology.`,
     "Preserve line breaks, row and round numbering, stitch counts, parentheses, brackets, repeats, punctuation, and abbreviations that are already in Portuguese.",
     "Do not add explanations, summaries, markdown fences, headings, or safety notes.",
@@ -52,6 +56,7 @@ function buildInstructions(sourceLanguage: LanguageCode, targetVariant?: Languag
 function sourceLanguageLabel(code: LanguageCode): string {
   if (code === "de") return "German";
   if (code === "en") return "English (US)";
+  if (code === "en-UK") return "English (UK)";
   return code;
 }
 

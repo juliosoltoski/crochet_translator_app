@@ -3,6 +3,7 @@ import { Languages, Upload } from "lucide-react";
 import {
   germanPortugueseCrochetGlossary,
   englishPortugueseCrochetGlossary,
+  englishUkPortugueseCrochetGlossary,
   type GlossaryMatch,
   type ExtractedText,
   type LanguageCode,
@@ -17,7 +18,10 @@ Rd. 2: (2 fM in jede M) 6x (12 M)
 R. 3: 1 Lm, wenden, 12 fM`,
   en: `Rnd 1: 6 sc in magic ring (6 sts)
 Rnd 2: 2 sc in each st around (6 inc) (12 sts)
-Row 3: ch 1, turn, 12 sc`
+Row 3: ch 1, turn, 12 sc`,
+  "en-UK": `Rnd 1: 6 dc into magic ring (6 sts)
+Rnd 2: 2 dc into each st (6 inc) (12 sts)
+Row 3: 1 ch, turn, 12 dc`
 };
 
 export function App() {
@@ -33,10 +37,11 @@ export function App() {
   const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
-  const activeGlossary = useMemo(
-    () => (sourceLanguage === "en" ? englishPortugueseCrochetGlossary : germanPortugueseCrochetGlossary),
-    [sourceLanguage]
-  );
+  const activeGlossary = useMemo(() => {
+    if (sourceLanguage === "en") return englishPortugueseCrochetGlossary;
+    if (sourceLanguage === "en-UK") return englishUkPortugueseCrochetGlossary;
+    return germanPortugueseCrochetGlossary;
+  }, [sourceLanguage]);
 
   async function handleTranslate() {
     await translateText(sourceText);
@@ -113,7 +118,7 @@ export function App() {
       <section className="workspace" aria-labelledby="page-title">
         <div className="masthead">
           <div>
-            <p className="eyebrow">German / English to Portuguese crochet</p>
+            <p className="eyebrow">German / English (US &amp; UK) to Portuguese crochet</p>
             <h1 id="page-title">Crochet Translator</h1>
           </div>
           <div className="privacy-pill" aria-label="Privacy mode">
@@ -137,6 +142,7 @@ export function App() {
             >
               <option value="de">German</option>
               <option value="en">English (US)</option>
+              <option value="en-UK">English (UK)</option>
             </select>
           </label>
 
@@ -172,13 +178,13 @@ export function App() {
           <section className="panel" aria-labelledby="source-heading">
             <div className="panel-heading">
               <h2 id="source-heading">Source</h2>
-              <span>{sourceLanguage === "en" ? "English (US) crochet text" : "German crochet text"}</span>
+              <span>{sourcePanelLabel(sourceLanguage)}</span>
             </div>
             <textarea
               value={sourceText}
               onChange={(event) => setSourceText(event.target.value)}
               spellCheck={false}
-              aria-label={sourceLanguage === "en" ? "English crochet source text" : "German crochet source text"}
+              aria-label={`${sourcePanelLabel(sourceLanguage)} source text`}
             />
           </section>
 
@@ -242,6 +248,12 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function sourcePanelLabel(lang: string): string {
+  if (lang === "en") return "English (US) crochet text";
+  if (lang === "en-UK") return "English (UK) crochet text";
+  return "German crochet text";
 }
 
 async function checkImageIsWide(file: File): Promise<boolean> {
