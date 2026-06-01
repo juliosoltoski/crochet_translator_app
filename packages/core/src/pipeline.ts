@@ -1,4 +1,10 @@
 import { germanPortugueseCrochetGlossary } from "./glossary-data/de-pt-crochet";
+import { englishPortugueseCrochetGlossary } from "./glossary-data/en-pt-crochet";
+
+const defaultCrochetGlossary = [
+  ...germanPortugueseCrochetGlossary,
+  ...englishPortugueseCrochetGlossary
+];
 import { validatePatternStructure } from "./formatting";
 import { applyGlossaryReplacements } from "./glossary";
 import { PassthroughTranslationProvider, StaticLanguageDetectionProvider } from "./providers";
@@ -21,7 +27,7 @@ export async function runTranslationPipeline(
   input: TranslationPipelineInput,
   options: RunTranslationPipelineOptions = {}
 ): Promise<TranslationPipelineResult> {
-  const glossary = options.glossary ?? germanPortugueseCrochetGlossary;
+  const glossary = options.glossary ?? defaultCrochetGlossary;
   const languageDetectionProvider =
     options.languageDetectionProvider ?? new StaticLanguageDetectionProvider(input.sourceLanguage);
   const translationProvider = options.translationProvider ?? new PassthroughTranslationProvider();

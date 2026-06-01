@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { germanPortugueseCrochetGlossary } from "./glossary-data/de-pt-crochet";
+import { englishPortugueseCrochetGlossary } from "./glossary-data/en-pt-crochet";
 import { applyGlossaryReplacements } from "./glossary";
 
 describe("applyGlossaryReplacements", () => {
@@ -82,5 +83,87 @@ describe("applyGlossaryReplacements", () => {
     );
 
     expect(result.text).toContain("(12 pontos)");
+  });
+});
+
+describe("applyGlossaryReplacements (English)", () => {
+  it("replaces English crochet abbreviations with Portuguese equivalents", () => {
+    const result = applyGlossaryReplacements(
+      "Rnd 1: 6 sc in magic ring (6 sts)",
+      englishPortugueseCrochetGlossary,
+      {
+        sourceLanguage: "en",
+        targetLanguage: "pt",
+        targetVariant: "pt-PT",
+        craft: "crochet"
+      }
+    );
+
+    expect(result.text).toContain("volta 1");
+    expect(result.text).toContain("anel mágico");
+    expect(result.text).toContain("(6 pontos)");
+    expect(result.matches.map((m) => m.entryId)).toContain("crochet.en.pt.single-crochet");
+  });
+
+  it("uses plural stitch names after counts greater than one (English)", () => {
+    const result = applyGlossaryReplacements(
+      "Rnd 2: 2 sc in each st (12 sts)",
+      englishPortugueseCrochetGlossary,
+      {
+        sourceLanguage: "en",
+        targetLanguage: "pt",
+        targetVariant: "pt-BR",
+        craft: "crochet"
+      }
+    );
+
+    expect(result.text).toContain("2 pontos baixos");
+    expect(result.text).toContain("(12 pontos)");
+  });
+
+  it("prefers longer English terms before shorter abbreviations", () => {
+    const result = applyGlossaryReplacements(
+      "1 single crochet, 1 double crochet, 1 half double crochet",
+      englishPortugueseCrochetGlossary,
+      {
+        sourceLanguage: "en",
+        targetLanguage: "pt",
+        craft: "crochet"
+      }
+    );
+
+    expect(result.text).toBe("1 ponto baixo, 1 ponto alto, 1 meio ponto alto");
+  });
+
+  it("uses pt-BR variants when targetVariant is pt-BR", () => {
+    const result = applyGlossaryReplacements(
+      "6 ch, 1 turning chain",
+      englishPortugueseCrochetGlossary,
+      {
+        sourceLanguage: "en",
+        targetLanguage: "pt",
+        targetVariant: "pt-BR",
+        craft: "crochet"
+      }
+    );
+
+    expect(result.text).toContain("correntinhas");
+    expect(result.text).toContain("correntinha de virada");
+  });
+
+  it("does not apply English glossary to German source text", () => {
+    const result = applyGlossaryReplacements(
+      "6 fM in den Fadenring (6 M)",
+      englishPortugueseCrochetGlossary,
+      {
+        sourceLanguage: "de",
+        targetLanguage: "pt",
+        craft: "crochet"
+      }
+    );
+
+    // English glossary filtered out; text unchanged
+    expect(result.text).toBe("6 fM in den Fadenring (6 M)");
+    expect(result.matches).toHaveLength(0);
   });
 });

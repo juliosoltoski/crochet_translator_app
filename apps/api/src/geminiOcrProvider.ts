@@ -12,12 +12,14 @@ COLUMN HANDLING — this is the most important rule:
 - Before transcribing anything, identify how many columns of text exist on the page.
 - For a two-column layout: transcribe the ENTIRE left column from top to bottom first, then transcribe the ENTIRE right column from top to bottom.
 - Never read across a row and mix text from the left column and right column on the same output line.
-- Each section heading (e.g. HAAR, MATERIAL, KÖRPER, ROCK, ZÖPFE) must appear on its own line exactly as printed.
+- Each section heading must appear on its own line exactly as printed.
 
 FAITHFUL TRANSCRIPTION:
 - Copy every character exactly as it appears. Do not paraphrase, reorder, or summarise.
-- Preserve all crochet abbreviations exactly: LM, Stb, hStb, DStb, fM, fe M, Rd., R., KM, Km, wdh., zun., abn., Wdh., etc.
-- Preserve all numbers, parentheses, brackets, asterisks (*), equals signs (=), commas, semicolons, and repeat markers (e.g. "3x", "[...] 4x wdh.", "ab * 2x wdh.").
+- Preserve all crochet abbreviations exactly, including but not limited to:
+  German: LM, Stb, hStb, DStb, fM, fe M, Rd., R., KM, Km, wdh., zun., abn., Wdh., etc.
+  English: sc, dc, hdc, tr, ch, sl st, ss, MR, inc, dec, rep, sk, st, sts, rnd, Rnd., etc.
+- Preserve all numbers, parentheses, brackets, asterisks (*), equals signs (=), commas, semicolons, and repeat markers (e.g. "3x", "[...] 4x wdh.", "* 2x rep.").
 - Preserve line breaks as they appear in the source. Do not join continuation lines.
 
 INCLUDE: All text — section headings, material lists, gauge notes, row-by-row instructions, stitch counts, finishing notes.

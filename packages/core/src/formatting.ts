@@ -1,7 +1,7 @@
 import type { PipelineWarning } from "./types";
 
 const COUNT_TOKEN_REGEX =
-  /\(\s*\d+\s*(?:M|Maschen|Stiche|pontos?|pts?)\s*\)|\b\d+\s*x\b/giu;
+  /\(\s*\d+\s*(?:M|Maschen|Stiche|sts?|stitches?|pontos?|pts?)\s*\)|\b\d+\s*x\b/giu;
 
 export function normalizeLineEndings(text: string): string {
   return text.replace(/\r\n?/g, "\n");

@@ -2,6 +2,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { Languages, Upload } from "lucide-react";
 import {
   germanPortugueseCrochetGlossary,
+  englishPortugueseCrochetGlossary,
   type GlossaryMatch,
   type ExtractedText,
   type LanguageCode,
@@ -10,12 +11,18 @@ import {
 import { extractTextTransiently } from "./services/transientExtraction";
 import { translatePattern } from "./services/translationClient";
 
-const SAMPLE_PATTERN = `Rd. 1: 6 fM in den Fadenring (6 M)
+const SAMPLE_PATTERNS: Record<string, string> = {
+  de: `Rd. 1: 6 fM in den Fadenring (6 M)
 Rd. 2: (2 fM in jede M) 6x (12 M)
-R. 3: 1 Lm, wenden, 12 fM`;
+R. 3: 1 Lm, wenden, 12 fM`,
+  en: `Rnd 1: 6 sc in magic ring (6 sts)
+Rnd 2: 2 sc in each st around (6 inc) (12 sts)
+Row 3: ch 1, turn, 12 sc`
+};
 
 export function App() {
-  const [sourceText, setSourceText] = useState(SAMPLE_PATTERN);
+  const [sourceLanguage, setSourceLanguage] = useState<LanguageCode>("de");
+  const [sourceText, setSourceText] = useState(SAMPLE_PATTERNS["de"]);
   const [targetVariant, setTargetVariant] = useState<LanguageCode>("pt-PT");
   const [translatedText, setTranslatedText] = useState("");
   const [warnings, setWarnings] = useState<PipelineWarning[]>([]);
@@ -26,6 +33,10 @@ export function App() {
   const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
+  const activeGlossary = useMemo(
+    () => (sourceLanguage === "en" ? englishPortugueseCrochetGlossary : germanPortugueseCrochetGlossary),
+    [sourceLanguage]
+  );
 
   async function handleTranslate() {
     await translateText(sourceText);
@@ -46,7 +57,7 @@ export function App() {
     try {
       const result = await translatePattern({
         text,
-        sourceLanguage: "de",
+        sourceLanguage,
         targetLanguage: "pt",
         targetVariant,
         craft: "crochet"
@@ -102,7 +113,7 @@ export function App() {
       <section className="workspace" aria-labelledby="page-title">
         <div className="masthead">
           <div>
-            <p className="eyebrow">German to Portuguese crochet MVP</p>
+            <p className="eyebrow">German / English to Portuguese crochet</p>
             <h1 id="page-title">Crochet Translator</h1>
           </div>
           <div className="privacy-pill" aria-label="Privacy mode">
@@ -111,6 +122,24 @@ export function App() {
         </div>
 
         <div className="controls" aria-label="Translation settings">
+          <label className="field">
+            <span>Source language</span>
+            <select
+              value={sourceLanguage}
+              onChange={(event) => {
+                const lang = event.target.value;
+                setSourceLanguage(lang);
+                setSourceText(SAMPLE_PATTERNS[lang] ?? SAMPLE_PATTERNS["de"]);
+                setTranslatedText("");
+                setMatches([]);
+                setWarnings([]);
+              }}
+            >
+              <option value="de">German</option>
+              <option value="en">English (US)</option>
+            </select>
+          </label>
+
           <label className="field">
             <span>Portuguese variant</span>
             <select
@@ -143,13 +172,13 @@ export function App() {
           <section className="panel" aria-labelledby="source-heading">
             <div className="panel-heading">
               <h2 id="source-heading">Source</h2>
-              <span>German crochet text</span>
+              <span>{sourceLanguage === "en" ? "English (US) crochet text" : "German crochet text"}</span>
             </div>
             <textarea
               value={sourceText}
               onChange={(event) => setSourceText(event.target.value)}
               spellCheck={false}
-              aria-label="German crochet source text"
+              aria-label={sourceLanguage === "en" ? "English crochet source text" : "German crochet source text"}
             />
           </section>
 
@@ -172,7 +201,7 @@ export function App() {
           <p>
             {matchedTermCount > 0
               ? `${matchedTermCount} glossary matches found`
-              : `${germanPortugueseCrochetGlossary.length} glossary terms loaded`}
+              : `${activeGlossary.length} glossary terms loaded`}
             {" - "}
             {providerName}
             {" - "}

@@ -25,7 +25,7 @@ export class GeminiTranslationProvider implements TranslationProvider {
       model: this.model,
       contents: buildUserPrompt(input),
       config: {
-        systemInstruction: buildInstructions(input.targetVariant),
+        systemInstruction: buildInstructions(input.sourceLanguage, input.targetVariant),
         temperature: 0.2
       }
     });
@@ -34,18 +34,25 @@ export class GeminiTranslationProvider implements TranslationProvider {
   }
 }
 
-function buildInstructions(targetVariant?: LanguageCode): string {
+function buildInstructions(sourceLanguage: LanguageCode, targetVariant?: LanguageCode): string {
   const portugueseVariant =
     targetVariant === "pt-BR" ? "Brazilian Portuguese" : "European Portuguese";
+  const sourceLanguageName = sourceLanguageLabel(sourceLanguage);
 
   return [
     "You are a careful crochet pattern translator.",
-    "Translate German crochet pattern text into Portuguese.",
+    `Translate ${sourceLanguageName} crochet pattern text into Portuguese.`,
     `Use ${portugueseVariant} terminology.`,
     "Preserve line breaks, row and round numbering, stitch counts, parentheses, brackets, repeats, punctuation, and abbreviations that are already in Portuguese.",
     "Do not add explanations, summaries, markdown fences, headings, or safety notes.",
     "Return only the translated pattern text."
   ].join(" ");
+}
+
+function sourceLanguageLabel(code: LanguageCode): string {
+  if (code === "de") return "German";
+  if (code === "en") return "English (US)";
+  return code;
 }
 
 function buildUserPrompt(input: {
