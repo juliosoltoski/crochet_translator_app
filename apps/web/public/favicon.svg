@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#245e74"/>
+  <!-- C arc: 300° sweep, opens to the right -->
+  <path d="M23 12 A8 8 0 1 0 23 20" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>
+</svg>

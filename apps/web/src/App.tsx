@@ -261,6 +261,7 @@ export function App() {
                 )}
               </div>
             </div>
+            {isProcessing && <div className="panel-progress" role="progressbar" aria-label="Processing" aria-hidden="true" />}
             <output
               className={`translation-output${!translatedText ? " translation-output--empty" : ""}`}
               aria-live="polite"
