@@ -619,6 +619,15 @@ textarea:focus {
   padding: 9px 16px;
 }
 
+/* ── Match count ────────────────────────────────────────────────────────── */
+
+.match-count {
+  margin-left: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* ── Term badges ────────────────────────────────────────────────────────── */
 
 .term-badge {

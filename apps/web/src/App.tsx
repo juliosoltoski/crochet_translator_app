@@ -42,6 +42,17 @@ export function App() {
   const activeControllerRef = useRef<AbortController | null>(null);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
+
+  const dedupedMatches = useMemo(() => {
+    const seen = new Map<string, { match: typeof matches[0]; count: number }>();
+    for (const match of matches) {
+      const existing = seen.get(match.entryId);
+      if (existing) existing.count++;
+      else seen.set(match.entryId, { match, count: 1 });
+    }
+    return Array.from(seen.values());
+  }, [matches]);
+
   const activeGlossary = useMemo(() => {
     if (sourceLanguage === "en") return englishPortugueseCrochetGlossary;
     if (sourceLanguage === "en-UK") return englishUkPortugueseCrochetGlossary;
@@ -327,9 +338,12 @@ export function App() {
                 <span role="columnheader">Portuguese</span>
                 <span role="columnheader">Type</span>
               </div>
-              {matches.map((match, index) => (
-                <div className="match-row" role="row" key={`${match.entryId}-${index}`}>
-                  <span role="cell">{match.source}</span>
+              {dedupedMatches.map(({ match, count }) => (
+                <div className="match-row" role="row" key={match.entryId}>
+                  <span role="cell">
+                    {match.source}
+                    {count > 1 && <span className="match-count">×{count}</span>}
+                  </span>
                   <span role="cell">{match.target}</span>
                   <span role="cell"><span className="term-badge">{match.kind}</span></span>
                 </div>
