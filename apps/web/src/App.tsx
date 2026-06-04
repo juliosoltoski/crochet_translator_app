@@ -27,7 +27,9 @@ Row 3: 1 ch, turn, 12 dc`
 export function App() {
   const [sourceLanguage, setSourceLanguage] = useState<LanguageCode>("de");
   const [sourceText, setSourceText] = useState(SAMPLE_PATTERNS["de"]);
-  const [targetVariant, setTargetVariant] = useState<LanguageCode>("pt-PT");
+  const [targetVariant, setTargetVariant] = useState<LanguageCode>(
+    () => localStorage.getItem("targetVariant") ?? "pt-PT"
+  );
   const [translatedText, setTranslatedText] = useState("");
   const [warnings, setWarnings] = useState<PipelineWarning[]>([]);
   const [matches, setMatches] = useState<GlossaryMatch[]>([]);
@@ -199,7 +201,10 @@ export function App() {
             <span>Portuguese variant</span>
             <select
               value={targetVariant}
-              onChange={(event) => setTargetVariant(event.target.value)}
+              onChange={(event) => {
+                localStorage.setItem("targetVariant", event.target.value);
+                setTargetVariant(event.target.value);
+              }}
             >
               <option value="pt-PT">European Portuguese</option>
               <option value="pt-BR">Brazilian Portuguese</option>

@@ -51,8 +51,6 @@ export async function runTranslationPipeline(
     craft: input.craft ?? "crochet"
   });
 
-  // TODO(provider): Replace passthrough translation with an LLM or translation API.
-  // Keep provider prompts/contracts explicit about preserving counts, line breaks, and repeats.
   const translatedText = await translationProvider.translate({
     text: glossaryResult.text,
     sourceLanguage: input.sourceLanguage,
