@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
-import { Languages, Upload } from "lucide-react";
+import { Copy, Download, Languages, Upload } from "lucide-react";
 import {
   germanPortugueseCrochetGlossary,
   englishPortugueseCrochetGlossary,
@@ -35,6 +35,7 @@ export function App() {
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [providerName, setProviderName] = useState("local passthrough");
   const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
   const activeGlossary = useMemo(() => {
@@ -45,6 +46,22 @@ export function App() {
 
   async function handleTranslate() {
     await translateText(sourceText);
+  }
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(translatedText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  function handleDownload() {
+    const blob = new Blob([translatedText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "translation.txt";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function translateText(text: string, extractionWarnings: PipelineWarning[] = []) {
@@ -191,7 +208,21 @@ export function App() {
           <section className="panel" aria-labelledby="translation-heading">
             <div className="panel-heading">
               <h2 id="translation-heading">Translation</h2>
-              <span>Portuguese terminology preview</span>
+              <div className="panel-actions">
+                <span>Portuguese terminology preview</span>
+                {translatedText && (
+                  <>
+                    <button type="button" onClick={handleCopy} aria-label="Copy translation to clipboard">
+                      <Copy aria-hidden="true" size={15} />
+                      <span>{copied ? "Copied!" : "Copy"}</span>
+                    </button>
+                    <button type="button" onClick={handleDownload} aria-label="Download translation as text file">
+                      <Download aria-hidden="true" size={15} />
+                      <span>Download</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <output className="translation-output" aria-live="polite">
               {translatedText || "Run translation to preview glossary-aware output."}
