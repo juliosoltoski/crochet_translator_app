@@ -261,8 +261,11 @@ export function App() {
                 )}
               </div>
             </div>
-            <output className="translation-output" aria-live="polite">
-              {translatedText || "Run translation to preview glossary-aware output."}
+            <output
+              className={`translation-output${!translatedText ? " translation-output--empty" : ""}`}
+              aria-live="polite"
+            >
+              {translatedText || <span>Translate to see output.</span>}
             </output>
           </section>
         </div>
@@ -277,14 +280,16 @@ export function App() {
               Cancel
             </button>
           )}
-          <p>
-            {matchedTermCount > 0
-              ? `${matchedTermCount} glossary matches found`
-              : `${activeGlossary.length} glossary terms loaded`}
-            {" - "}
-            {providerName}
-            {" - "}
-            {statusMessage}
+          <p className="status-text">
+            <span>
+              {matchedTermCount > 0
+                ? `${matchedTermCount} matches`
+                : `${activeGlossary.length} terms`}
+            </span>
+            <span className="status-sep">·</span>
+            <span className="status-provider">{providerName}</span>
+            <span className="status-sep">·</span>
+            <span>{statusMessage}</span>
           </p>
         </div>
 
@@ -312,7 +317,7 @@ export function App() {
                 <div className="match-row" role="row" key={`${match.entryId}-${index}`}>
                   <span role="cell">{match.source}</span>
                   <span role="cell">{match.target}</span>
-                  <span role="cell">{match.kind}</span>
+                  <span role="cell"><span className="term-badge">{match.kind}</span></span>
                 </div>
               ))}
             </div>
