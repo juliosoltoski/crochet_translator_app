@@ -9,6 +9,11 @@ import {
   type OcrSegmentationMode
 } from "./imagePreprocessing";
 
+export interface ExtractionOptions {
+  signal?: AbortSignal;
+  onProgress?: (message: string) => void;
+}
+
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const MIN_SELECTABLE_PDF_CHARACTERS = 200;
@@ -33,7 +38,10 @@ interface OcrResult {
   candidateLabel?: string;
 }
 
-export async function extractTextTransiently(file: File): Promise<ExtractedText> {
+export async function extractTextTransiently(
+  file: File,
+  options?: ExtractionOptions
+): Promise<ExtractedText> {
   try {
     if (isTextFile(file)) {
       return {
@@ -43,11 +51,11 @@ export async function extractTextTransiently(file: File): Promise<ExtractedText>
     }
 
     if (isPdfFile(file)) {
-      return await extractPdfText(file);
+      return await extractPdfText(file, options);
     }
 
     if (file.type.startsWith("image/")) {
-      return await extractImageText(file);
+      return await extractImageText(file, options);
     }
 
     return {
@@ -62,6 +70,7 @@ export async function extractTextTransiently(file: File): Promise<ExtractedText>
       ]
     };
   } catch (error) {
+    if (isAbortError(error)) throw error;
     return {
       text: "",
       confidence: 0,
@@ -76,8 +85,9 @@ export async function extractTextTransiently(file: File): Promise<ExtractedText>
   }
 }
 
-async function extractPdfText(file: File): Promise<ExtractedText> {
+async function extractPdfText(file: File, options?: ExtractionOptions): Promise<ExtractedText> {
   const warnings: PipelineWarning[] = [];
+  options?.onProgress?.("Reading PDF");
   const bytes = new Uint8Array(await file.arrayBuffer());
   const loadingTask = pdfjs.getDocument({ data: bytes });
   const pdf = await loadingTask.promise;
@@ -86,6 +96,7 @@ async function extractPdfText(file: File): Promise<ExtractedText> {
     const pageTexts: string[] = [];
 
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      options?.signal?.throwIfAborted();
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       const pageText = textItemsToLines(content.items).trim();
@@ -119,7 +130,7 @@ async function extractPdfText(file: File): Promise<ExtractedText> {
       message: "The PDF appears to be scanned, so OCR was used."
     });
 
-    return await extractScannedPdfText(pdf, warnings);
+    return await extractScannedPdfText(pdf, warnings, options);
   } finally {
     await pdf.destroy();
   }
@@ -127,7 +138,8 @@ async function extractPdfText(file: File): Promise<ExtractedText> {
 
 async function extractScannedPdfText(
   pdf: PdfDocumentProxy,
-  warnings: PipelineWarning[]
+  warnings: PipelineWarning[],
+  options?: ExtractionOptions
 ): Promise<ExtractedText> {
   const pageLimit = Math.min(pdf.numPages, MAX_OCR_PDF_PAGES);
   const pageTexts: string[] = [];
@@ -142,6 +154,9 @@ async function extractScannedPdfText(
   }
 
   for (let pageNumber = 1; pageNumber <= pageLimit; pageNumber += 1) {
+    options?.signal?.throwIfAborted();
+    options?.onProgress?.(`Running OCR on page ${pageNumber} of ${pageLimit}`);
+
     const page = await pdf.getPage(pageNumber);
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -164,7 +179,7 @@ async function extractScannedPdfText(
       maxCandidates: 2,
       segmentationMode: "auto"
     });
-    const result = await recognizeBestCandidate(preprocessed.candidates);
+    const result = await recognizeBestCandidate(preprocessed.candidates, options);
     pageTexts.push(result.text.trim());
     confidences.push(result.confidence);
     warnings.push(...preprocessingWarnings(preprocessed.warnings));
@@ -178,7 +193,9 @@ async function extractScannedPdfText(
   };
 }
 
-async function extractImageText(file: File): Promise<ExtractedText> {
+async function extractImageText(file: File, options?: ExtractionOptions): Promise<ExtractedText> {
+  options?.onProgress?.("Preparing image");
+
   // Load the image into a canvas so we can inspect its layout before sending to OCR.
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   const canvas = document.createElement("canvas");
@@ -190,8 +207,9 @@ async function extractImageText(file: File): Promise<ExtractedText> {
   const columns = detectAndSplitColumns(canvas);
 
   if (columns.length > 1) {
+    options?.onProgress?.(`Extracting ${columns.length} columns`);
     const results = await Promise.all(
-      columns.map((col) => extractCanvasText(col, file.type || "image/jpeg"))
+      columns.map((col) => extractCanvasText(col, file.type || "image/jpeg", options))
     );
     const combinedText = results
       .map((r) => r.text)
@@ -208,11 +226,12 @@ async function extractImageText(file: File): Promise<ExtractedText> {
   }
 
   // Single-column path: try server OCR first, then Tesseract.
-  const serverResult = await tryServerOcr(file);
+  options?.onProgress?.("Running OCR");
+  const serverResult = await tryServerOcr(file, options?.signal);
   if (serverResult !== null) return serverResult;
 
   const preprocessed = await preprocessImageForOcr(file, { segmentationMode: "single-column" });
-  const result = await recognizeBestCandidate(preprocessed.candidates);
+  const result = await recognizeBestCandidate(preprocessed.candidates, options);
   return {
     text: normalizeExtractedText(result.text),
     confidence: result.confidence,
@@ -225,17 +244,18 @@ async function extractImageText(file: File): Promise<ExtractedText> {
 
 async function extractCanvasText(
   canvas: HTMLCanvasElement,
-  mimeType: string
+  mimeType: string,
+  options?: ExtractionOptions
 ): Promise<ExtractedText> {
   const base64 = canvasToJpegBase64(canvas);
-  const serverResult = await tryServerOcrBase64(base64, mimeType);
+  const serverResult = await tryServerOcrBase64(base64, mimeType, options?.signal);
   if (serverResult !== null) return serverResult;
 
   const preprocessed = preprocessCanvasForOcr(canvas, {
     maxCandidates: 2,
     segmentationMode: "single-column"
   });
-  const result = await recognizeBestCandidate(preprocessed.candidates);
+  const result = await recognizeBestCandidate(preprocessed.candidates, options);
   return {
     text: normalizeExtractedText(result.text),
     confidence: result.confidence,
@@ -262,21 +282,23 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function tryServerOcr(file: File): Promise<ExtractedText | null> {
+async function tryServerOcr(file: File, signal?: AbortSignal): Promise<ExtractedText | null> {
   const arrayBuffer = await file.arrayBuffer();
   const base64 = arrayBufferToBase64(arrayBuffer);
-  return tryServerOcrBase64(base64, file.type || "image/jpeg");
+  return tryServerOcrBase64(base64, file.type || "image/jpeg", signal);
 }
 
 async function tryServerOcrBase64(
   base64: string,
-  mimeType: string
+  mimeType: string,
+  signal?: AbortSignal
 ): Promise<ExtractedText | null> {
   try {
     const response = await fetch(OCR_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageData: base64, mimeType })
+      body: JSON.stringify({ imageData: base64, mimeType }),
+      signal
     });
 
     if (!response.ok) return null;
@@ -289,7 +311,8 @@ async function tryServerOcrBase64(
     }
 
     return result;
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -317,7 +340,8 @@ async function recognizeImage(
 }
 
 async function recognizeBestCandidate(
-  candidates: ImagePreprocessingCandidate[]
+  candidates: ImagePreprocessingCandidate[],
+  options?: ExtractionOptions
 ): Promise<OcrResult> {
   const tesseract = await loadTesseract();
   const worker = await tesseract.createWorker(OCR_LANGUAGE, tesseract.OEM.LSTM_ONLY, {
@@ -326,7 +350,10 @@ async function recognizeBestCandidate(
   let bestResult: OcrResult | null = null;
 
   try {
-    for (const candidate of candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      options?.signal?.throwIfAborted();
+      options?.onProgress?.(`Running OCR (pass ${i + 1} of ${candidates.length})`);
+      const candidate = candidates[i];
       const result = await recognizeImage(worker, candidate.canvas, candidate.segmentationMode);
       const scoredResult = {
         ...result,
@@ -465,6 +492,10 @@ function scoreOcrResult(result: OcrResult): number {
   const qualityRatio = text.length > 0 ? alphanumericCount / text.length : 0;
 
   return result.confidence + crochetTokenMatches.length * 0.015 + lineCount * 0.002 + qualityRatio * 0.05;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function normalizeOcrText(text: string): string {

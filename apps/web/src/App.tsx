@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Copy, Download, Languages, Upload } from "lucide-react";
 import {
   germanPortugueseCrochetGlossary,
@@ -36,6 +36,7 @@ export function App() {
   const [providerName, setProviderName] = useState("local passthrough");
   const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
   const [copied, setCopied] = useState(false);
+  const activeControllerRef = useRef<AbortController | null>(null);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
   const activeGlossary = useMemo(() => {
@@ -44,8 +45,24 @@ export function App() {
     return germanPortugueseCrochetGlossary;
   }, [sourceLanguage]);
 
+  function handleCancel() {
+    activeControllerRef.current?.abort();
+    activeControllerRef.current = null;
+    setIsProcessing(false);
+    setStatusMessage("Ready");
+  }
+
   async function handleTranslate() {
-    await translateText(sourceText);
+    activeControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+    try {
+      await translateText(sourceText, [], controller.signal);
+    } catch (err) {
+      if (!isAbortError(err)) throw err;
+    } finally {
+      if (activeControllerRef.current === controller) activeControllerRef.current = null;
+    }
   }
 
   async function handleCopy() {
@@ -64,7 +81,11 @@ export function App() {
     URL.revokeObjectURL(url);
   }
 
-  async function translateText(text: string, extractionWarnings: PipelineWarning[] = []) {
+  async function translateText(
+    text: string,
+    extractionWarnings: PipelineWarning[] = [],
+    signal?: AbortSignal
+  ) {
     if (!text.trim()) {
       setTranslatedText("");
       setMatches([]);
@@ -82,7 +103,8 @@ export function App() {
         sourceLanguage,
         targetLanguage: "pt",
         targetVariant,
-        craft: "crochet"
+        craft: "crochet",
+        signal
       });
 
       setTranslatedText(result.translatedText);
@@ -102,6 +124,10 @@ export function App() {
       return;
     }
 
+    activeControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
+
     setShowMultiColumnHint(false);
     setIsProcessing(true);
     setStatusMessage("Extracting text");
@@ -112,21 +138,27 @@ export function App() {
     }
 
     try {
-      const extracted = await extractTextTransiently(file);
+      const extracted = await extractTextTransiently(file, {
+        signal: controller.signal,
+        onProgress: (msg) => setStatusMessage(msg)
+      });
       const extractionWarnings = warningsForExtraction(extracted);
       setWarnings(extractionWarnings);
       setMatches([]);
 
       if (extracted.text.trim()) {
         setSourceText(extracted.text);
-        await translateText(extracted.text, extractionWarnings);
+        await translateText(extracted.text, extractionWarnings, controller.signal);
       } else {
         setTranslatedText("");
         setStatusMessage("No text extracted");
       }
+    } catch (err) {
+      if (!isAbortError(err)) throw err;
     } finally {
       setIsProcessing(false);
       event.target.value = "";
+      if (activeControllerRef.current === controller) activeControllerRef.current = null;
     }
   }
 
@@ -235,6 +267,11 @@ export function App() {
             <Languages aria-hidden="true" size={18} />
             <span>{isProcessing ? "Processing..." : "Translate"}</span>
           </button>
+          {isProcessing && (
+            <button type="button" className="cancel-button" onClick={handleCancel}>
+              Cancel
+            </button>
+          )}
           <p>
             {matchedTermCount > 0
               ? `${matchedTermCount} glossary matches found`
@@ -279,6 +316,10 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 function sourcePanelLabel(lang: string): string {

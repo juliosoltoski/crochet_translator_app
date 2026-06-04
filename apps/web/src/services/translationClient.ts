@@ -13,6 +13,7 @@ export interface TranslatePatternInput {
   targetLanguage: LanguageCode;
   targetVariant?: LanguageCode;
   craft: Craft;
+  signal?: AbortSignal;
 }
 
 export interface TranslatePatternResult extends TranslationPipelineResult {
@@ -27,6 +28,7 @@ const API_BASE_URL = import.meta.env.VITE_TRANSLATION_API_URL ?? "";
 export async function translatePattern(
   input: TranslatePatternInput
 ): Promise<TranslatePatternResult> {
+  const { signal, ...body } = input;
   let apiWarnings: PipelineWarning[] = [];
 
   try {
@@ -36,9 +38,11 @@ export async function translatePattern(
       response = await fetch(`${API_BASE_URL}/api/translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input)
+        body: JSON.stringify(body),
+        signal
       });
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
       // Network-level failure: server is not reachable at all.
       throw new ApiError(
         "TRANSLATION_PROVIDER_UNAVAILABLE",
@@ -70,6 +74,7 @@ export async function translatePattern(
       providerName: result.provider ?? "api"
     };
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     const fallback = await runTranslationPipeline(input);
 
     const warning: PipelineWarning =

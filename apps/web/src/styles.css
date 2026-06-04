@@ -240,6 +240,23 @@ textarea,
   background: #82949a;
 }
 
+.cancel-button {
+  min-height: 48px;
+  border: 1px solid #c7d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: #59675f;
+  padding: 0 20px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cancel-button:hover {
+  background: #fff0ee;
+  border-color: #b3261e;
+  color: #b3261e;
+}
+
 .actions p {
   margin: 0;
   color: #59675f;
