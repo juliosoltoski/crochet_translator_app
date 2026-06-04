@@ -11,6 +11,7 @@ import {
 } from "@crochet-translator/core";
 import { extractTextTransiently } from "./services/transientExtraction";
 import { translatePattern } from "./services/translationClient";
+import { ImageRegionSelector, type NormalizedRect } from "./components/ImageRegionSelector";
 
 const SAMPLE_PATTERNS: Record<string, string> = {
   de: `Rd. 1: 6 fM in den Fadenring (6 M)
@@ -36,8 +37,8 @@ export function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [providerName, setProviderName] = useState("local passthrough");
-  const [showMultiColumnHint, setShowMultiColumnHint] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
 
   const matchedTermCount = useMemo(() => matches.length, [matches]);
@@ -121,23 +122,37 @@ export function App() {
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = "";
 
-    if (!file) {
+    if (file.type.startsWith("image/")) {
+      setPendingImageFile(file);
       return;
     }
 
+    await runExtraction(file);
+  }
+
+  async function handleRegionConfirm(selection: NormalizedRect | null) {
+    const file = pendingImageFile!;
+    setPendingImageFile(null);
+
+    let fileToOcr = file;
+    if (selection) {
+      const blob = await cropFileToBlob(file, selection);
+      fileToOcr = new File([blob], file.name, { type: "image/jpeg" });
+    }
+
+    await runExtraction(fileToOcr);
+  }
+
+  async function runExtraction(file: File) {
     activeControllerRef.current?.abort();
     const controller = new AbortController();
     activeControllerRef.current = controller;
 
-    setShowMultiColumnHint(false);
     setIsProcessing(true);
     setStatusMessage("Extracting text");
-
-    if (file.type.startsWith("image/")) {
-      const isWide = await checkImageIsWide(file);
-      setShowMultiColumnHint(isWide);
-    }
 
     try {
       const extracted = await extractTextTransiently(file, {
@@ -159,7 +174,6 @@ export function App() {
       if (!isAbortError(err)) throw err;
     } finally {
       setIsProcessing(false);
-      event.target.value = "";
       if (activeControllerRef.current === controller) activeControllerRef.current = null;
     }
   }
@@ -219,10 +233,12 @@ export function App() {
           </label>
         </div>
 
-        {showMultiColumnHint && (
-          <p className="notice info" role="note">
-            Multi-column layout detected. For best results, crop the image to one column before uploading.
-          </p>
+        {pendingImageFile && (
+          <ImageRegionSelector
+            file={pendingImageFile}
+            onConfirm={handleRegionConfirm}
+            onCancel={() => setPendingImageFile(null)}
+          />
         )}
 
         <div className="editor-grid">
@@ -336,23 +352,27 @@ function sourcePanelLabel(lang: string): string {
   return "German crochet text";
 }
 
-async function checkImageIsWide(file: File): Promise<boolean> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img.width > img.height * 1.4);
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(false);
-    };
-
-    img.src = url;
-  });
+async function cropFileToBlob(
+  file: File,
+  sel: { x: number; y: number; w: number; h: number }
+): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const sx = Math.round(sel.x * bitmap.width);
+  const sy = Math.round(sel.y * bitmap.height);
+  const sw = Math.max(1, Math.round(sel.w * bitmap.width));
+  const sh = Math.max(1, Math.round(sel.h * bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = sw;
+  canvas.height = sh;
+  canvas.getContext("2d")!.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Crop failed"))),
+      "image/jpeg",
+      0.95
+    )
+  );
 }
 
 function warningsForExtraction(extracted: ExtractedText): PipelineWarning[] {
