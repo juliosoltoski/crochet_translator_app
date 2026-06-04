@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { ApiError } from "@google/genai";
 import {
   runTranslationPipeline,
   type Craft,
@@ -86,12 +87,9 @@ app.post("/api/ocr", async (request, response) => {
     const result = await ocrProvider.extract(body.imageData, body.mimeType);
     response.json(result);
   } catch (error) {
-    const warning: PipelineWarning = {
-      code: "EXTRACTION_FAILED",
-      severity: "error",
-      message: error instanceof Error ? `OCR failed: ${error.message}` : "OCR failed."
-    };
-
+    console.error("[ocr]", error);
+    const message = classifyGeminiError(error, "ocr");
+    const warning: PipelineWarning = { code: "EXTRACTION_FAILED", severity: "error", message };
     response.status(502).json({ text: "", confidence: 0, warnings: [warning] });
   }
 });
@@ -118,16 +116,10 @@ app.post("/api/translate", async (request, response) => {
 
     response.json(body);
   } catch (error) {
-    const warning: PipelineWarning = {
-      code: "TRANSLATION_FAILED",
-      severity: "error",
-      message: translationErrorMessage(error)
-    };
-
-    response.status(502).json({
-      error: warning.message,
-      warnings: [warning]
-    });
+    console.error("[translate]", error);
+    const message = classifyGeminiError(error, "translation");
+    const warning: PipelineWarning = { code: "TRANSLATION_FAILED", severity: "error", message };
+    response.status(502).json({ error: message, warnings: [warning] });
   }
 });
 
@@ -186,10 +178,17 @@ function stringOrDefault(value: unknown, fallback: string): string {
   return typeof value === "string" && value.length > 0 ? value : fallback;
 }
 
-function translationErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return `Translation provider failed: ${error.message}`;
+function classifyGeminiError(error: unknown, context: "translation" | "ocr"): string {
+  const label = context === "translation" ? "Translation" : "OCR";
+
+  if (error instanceof ApiError) {
+    const s = error.status;
+    if (s === 429) return `${label} rate limit reached. Wait a moment and try again.`;
+    if (s === 401 || s === 403) return `${label} API key is invalid. Check the GEMINI_API_KEY setting.`;
+    if (s === 404) return `${label} model not found. Check the GEMINI_${context === "translation" ? "TRANSLATION" : "OCR"}_MODEL setting.`;
+    if (s === 400) return `The request was rejected by the ${label.toLowerCase()} provider. The pattern text may be too long or contain unsupported content.`;
+    if (s !== undefined && s >= 500) return `${label} service is temporarily unavailable. Try again shortly.`;
   }
 
-  return "Translation provider failed.";
+  return `${label} provider failed.`;
 }
