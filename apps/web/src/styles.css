@@ -121,21 +121,6 @@ h2 {
   color: var(--text-2);
 }
 
-/* ── Privacy pill ───────────────────────────────────────────────────────── */
-
-.privacy-pill {
-  flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-muted);
-  padding: 5px 13px;
-  white-space: nowrap;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: var(--surface);
-  letter-spacing: 0.01em;
-}
-
 /* ── Controls ───────────────────────────────────────────────────────────── */
 
 .controls {

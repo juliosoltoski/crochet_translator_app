@@ -172,9 +172,6 @@ export function App() {
             <p className="eyebrow">German / English (US &amp; UK) to Portuguese crochet</p>
             <h1 id="page-title">Crochet Translator</h1>
           </div>
-          <div className="privacy-pill" aria-label="Privacy mode">
-            transient processing
-          </div>
         </div>
 
         <div className="controls" aria-label="Translation settings">
